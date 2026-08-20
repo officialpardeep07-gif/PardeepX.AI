@@ -50,6 +50,19 @@ body{font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text);h
 .send-btn{width:42px;height:42px;border:0;border-radius:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;cursor:pointer;font-size:17px}.send-btn:disabled{opacity:.4}
 .disclaimer{text-align:center;font-size:10px;color:var(--muted);margin-top:8px}.file-name{display:none;padding:7px 10px;background:var(--bg);border-radius:8px;color:var(--muted);font-size:11px;margin:3px 5px}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:15}
+.voice-overlay{display:none;position:fixed;inset:0;background:rgba(10,8,20,.75);backdrop-filter:blur(8px);z-index:50;flex-direction:column;align-items:center;justify-content:center}
+.voice-overlay.show{display:flex}
+.voice-orb{width:150px;height:150px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:58px;transition:transform .25s}
+.voice-orb.listening{animation:voicePulse 1.4s infinite}
+.voice-orb.speaking{animation:voiceSpeak 1s infinite}
+.voice-orb.thinking{animation:voiceThink 1.1s infinite linear}
+@keyframes voicePulse{0%{box-shadow:0 0 0 0 rgba(139,124,255,.55)}70%{box-shadow:0 0 0 40px rgba(139,124,255,0)}100%{box-shadow:0 0 0 0 rgba(139,124,255,0)}}
+@keyframes voiceSpeak{0%,100%{transform:scale(1)}50%{transform:scale(1.09)}}
+@keyframes voiceThink{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+.voice-status{color:#fff;margin-top:30px;font-size:17px;font-weight:700;text-align:center;max-width:85%}
+.voice-transcript{color:rgba(255,255,255,.65);margin-top:10px;font-size:13px;text-align:center;max-width:85%;min-height:18px;line-height:1.5}
+.voice-close{margin-top:44px;width:54px;height:54px;border-radius:50%;border:0;background:rgba(255,255,255,.12);color:#fff;font-size:20px;cursor:pointer}
+.voice-close:hover{background:rgba(255,255,255,.22)}
 @media(max-width:750px){
 .sidebar{position:fixed;left:-280px;top:0;bottom:0;box-shadow:10px 0 35px rgba(0,0,0,.15)}.sidebar.open{left:0}.overlay.show{display:block}.mobile-menu{display:flex}
 .topbar{padding:0 14px;padding-top:calc(env(safe-area-inset-top,0px) + 8px);min-height:66px}.input-area{left:0;padding:10px 10px 13px}.chat{padding:25px 14px 150px}.suggestions{grid-template-columns:1fr}.bubble{max-width:85%}.welcome{min-height:65vh}.welcome h1{font-size:34px}
@@ -70,6 +83,12 @@ body{font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text);h
 </div>
 </aside>
 <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+<div class="voice-overlay" id="voiceOverlay">
+<div class="voice-orb" id="voiceOrb">🎙</div>
+<div class="voice-status" id="voiceStatus">Connecting...</div>
+<div class="voice-transcript" id="voiceTranscript"></div>
+<button class="voice-close" onclick="closeVoiceMode()" title="Stop">✕</button>
+</div>
 <main class="main">
 <header class="topbar">
 <div style="display:flex;align-items:center;gap:12px"><button class="mobile-menu" onclick="openSidebar()">☰</button><div class="model-name">PardeepX AI<small>Personal AI Assistant</small></div></div>
@@ -92,7 +111,7 @@ body{font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text);h
 <input type="file" id="fileInput" accept="image/*" hidden onchange="handleFile(this)">
 <button class="input-action" onclick="document.getElementById('fileInput').click()">＋</button>
 <textarea id="messageInput" rows="1" placeholder="Message PardeepX..." onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-<button class="input-action" onclick="voiceInput()">🎙</button><button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+<button class="input-action" onclick="voiceInput()" title="Voice to text">🎙</button><button class="input-action" onclick="openVoiceMode()" title="Voice Assistant">🗣️</button><button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
 </div></div><div class="disclaimer">PardeepX can make mistakes. Check important information.</div></div>
 <script>
 const input=document.getElementById("messageInput"),chatInner=document.getElementById("chatInner"),welcome=document.getElementById("welcome"),historyBox=document.getElementById("history");
@@ -260,6 +279,118 @@ reader.readAsDataURL(file);
 }
 function clearAttachment(){attachedImage=null;const fileInput=document.getElementById("fileInput");if(fileInput)fileInput.value="";const fileName=document.getElementById("fileName");fileName.style.display="none";fileName.innerHTML=""}
 function voiceInput(){if(!("webkitSpeechRecognition"in window)){alert("Voice input is not supported in this browser.");return}const recognition=new webkitSpeechRecognition();recognition.lang="hi-IN";recognition.start();recognition.onresult=e=>{input.value=e.results[0][0].transcript;autoResize(input)}}
+
+// ===== Voice Assistant (Jai Bhawani mode) =====
+const VOICE_GREETING="जय भवानी! मेरा नाम प्रदीपX है। मैं आपकी कैसे मदद कर सकता हूँ";
+let voiceActive=false,voiceRecognition=null;
+
+function pickHindiVoice(){
+const voices=("speechSynthesis"in window)?speechSynthesis.getVoices():[];
+const hindiVoices=voices.filter(v=>v.lang==="hi-IN"||(v.lang&&v.lang.startsWith("hi")));
+const maleKeywords=["male","hemant","rishi","madhur","prabhat","ravi","puneet","आदित्य","aditya","man"];
+const femaleKeywords=["female","स्वरा","swara","priya","woman","girl"];
+let male=hindiVoices.find(v=>{const n=(v.name||"").toLowerCase();return maleKeywords.some(k=>n.includes(k))&&!femaleKeywords.some(k=>n.includes(k))});
+if(male)return male;
+let notFemale=hindiVoices.find(v=>{const n=(v.name||"").toLowerCase();return !femaleKeywords.some(k=>n.includes(k))});
+if(notFemale)return notFemale;
+if(hindiVoices.length)return hindiVoices[0];
+return voices.find(v=>v.lang&&v.lang.startsWith("hi"))||null;
+}
+
+function speakText(text,onEnd){
+if(!text||!text.trim()){if(onEnd)onEnd();return}
+if(!("speechSynthesis"in window)){if(onEnd)onEnd();return}
+speechSynthesis.cancel();
+const utter=new SpeechSynthesisUtterance(text);
+utter.lang="hi-IN";
+const v=pickHindiVoice();if(v)utter.voice=v;
+utter.rate=0.95;utter.pitch=0.72;utter.volume=1;
+let done=false;
+const finish=()=>{if(done)return;done=true;if(onEnd)onEnd()};
+utter.onend=finish;utter.onerror=finish;
+speechSynthesis.speak(utter);
+}
+
+function htmlToSpeechText(html){
+const div=document.createElement("div");
+div.innerHTML=(html||"").replace(/<br\s*\/?>/gi,". ").replace(/<img[^>]*>/gi,"");
+return (div.textContent||div.innerText||"").trim();
+}
+
+function setVoiceState(state,statusText){
+const orb=document.getElementById("voiceOrb");
+if(orb)orb.className="voice-orb"+(state?" "+state:"");
+const st=document.getElementById("voiceStatus");
+if(st)statusText!==undefined&&(st.textContent=statusText);
+}
+
+function openVoiceMode(){
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SR){alert("Voice assistant is not supported in this browser.");return}
+closeSidebar();
+document.getElementById("voiceOverlay").classList.add("show");
+document.getElementById("voiceTranscript").textContent="";
+voiceActive=true;
+setVoiceState("speaking","जय भवानी! बोल रहा हूँ...");
+speakText(VOICE_GREETING,()=>{if(voiceActive)startVoiceListening()});
+}
+
+function startVoiceListening(){
+if(!voiceActive)return;
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+voiceRecognition=new SR();
+voiceRecognition.lang="hi-IN";
+voiceRecognition.interimResults=false;
+voiceRecognition.maxAlternatives=1;
+setVoiceState("listening","सुन रहा हूँ... बोलिए 🎙");
+document.getElementById("voiceTranscript").textContent="";
+voiceRecognition.onresult=e=>{
+const transcript=e.results[0][0].transcript;
+document.getElementById("voiceTranscript").textContent=transcript;
+handleVoiceQuery(transcript);
+};
+voiceRecognition.onerror=e=>{
+if(!voiceActive)return;
+if(e.error==="no-speech"||e.error==="aborted"){
+setTimeout(()=>{if(voiceActive)startVoiceListening()},400);
+}else{
+setVoiceState("listening","माइक्रोफोन में समस्या है, दोबारा कोशिश हो रही है...");
+setTimeout(()=>{if(voiceActive)startVoiceListening()},1200);
+}
+};
+try{voiceRecognition.start()}catch(err){setTimeout(()=>{if(voiceActive)startVoiceListening()},600)}
+}
+
+async function handleVoiceQuery(transcript){
+if(!voiceActive)return;
+if(!transcript||!transcript.trim()){startVoiceListening();return}
+if(document.getElementById("welcome"))document.getElementById("welcome").remove();
+addMessage("user",transcript);
+saveChat(transcript);
+setVoiceState("thinking","सोच रहा हूँ...");
+showTyping();
+try{
+const reply=await getAIReply(transcript,null);
+removeTyping();
+addMessage("ai",reply);
+const speechText=htmlToSpeechText(reply);
+setVoiceState("speaking","बोल रहा हूँ...");
+speakText(speechText||"माफ़ कीजिए, मुझे जवाब नहीं मिला।",()=>{if(voiceActive)startVoiceListening()});
+}catch(err){
+removeTyping();
+addMessage("ai",`⚠️ Error: ${escapeHTML(err.message)}`);
+setVoiceState("speaking","माफ़ कीजिए, कुछ गड़बड़ हो गई...");
+speakText("माफ़ कीजिए, कुछ गड़बड़ हो गई। "+err.message,()=>{if(voiceActive)startVoiceListening()});
+}
+}
+
+function closeVoiceMode(){
+voiceActive=false;
+if(voiceRecognition){try{voiceRecognition.onresult=null;voiceRecognition.onerror=null;voiceRecognition.stop()}catch(e){}}
+if("speechSynthesis"in window)speechSynthesis.cancel();
+document.getElementById("voiceOverlay").classList.remove("show");
+}
+if("speechSynthesis"in window){speechSynthesis.onvoiceschanged=()=>{}}
 function handleKey(event){if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage()}}
 function autoResize(element){element.style.height="auto";element.style.height=Math.min(element.scrollHeight,130)+"px"}
 function scrollBottom(){setTimeout(()=>document.getElementById("chat").scrollTo({top:document.getElementById("chat").scrollHeight,behavior:"smooth"}),50)}
