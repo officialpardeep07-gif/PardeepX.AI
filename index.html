@@ -64,6 +64,7 @@ body{font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text);h
 <div class="history-title">Recent chats</div><div class="history" id="history"></div>
 <div class="bottom-menu">
 <button class="menu-btn" onclick="toggleTheme()">◐ &nbsp; Appearance</button>
+<button class="menu-btn" onclick="setApiKey()">🔑 &nbsp; Set Gemini API Key</button>
 <button class="menu-btn" onclick="showAbout()">ⓘ &nbsp; About PardeepX</button>
 <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:12px">Developed and designed by<br><b>Pardeep Shekhawat</b></div>
 </div>
@@ -97,8 +98,17 @@ body{font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text);h
 const input=document.getElementById("messageInput"),chatInner=document.getElementById("chatInner"),welcome=document.getElementById("welcome"),historyBox=document.getElementById("history");
 let chats=JSON.parse(localStorage.getItem("pardeepx_chats")||"[]");
 
-// ⚠️ Yeh key seedha code mein hai, isliye is file ko dekhne wala HAR user isse use kar sakta hai (shared for everyone, not per-device).
-const GEMINI_API_KEY="AQ.Ab8RN6LyRV0eIt8JENsRhYZB4pxR3KR4viF8F-rfbz12pFyIUA";
+// ⚠️ Yeh key seedha code mein hai, isliye is file ko dekhne wala HAR user isse use kar sakta hai (shared default key). User chahe to sidebar se apni khud ki key daal sakta hai jo iski jagah use hogi.
+const DEFAULT_GEMINI_API_KEY="AQ.Ab8RN6LyRV0eIt8JENsRhYZB4pxR3KR4viF8F-rfbz12pFyIUA";
+
+function getApiKey(){return localStorage.getItem("pardeepx_user_gemini_key")||DEFAULT_GEMINI_API_KEY}
+function setApiKey(){
+const current=localStorage.getItem("pardeepx_user_gemini_key")||"";
+const key=prompt("Apni Gemini API key daalein (Google AI Studio se free milti hai):",current);
+if(key===null)return;
+if(key.trim()){localStorage.setItem("pardeepx_user_gemini_key",key.trim());alert("API key saved ✅ Ab yeh key aapke device pe use hogi.")}
+else{localStorage.removeItem("pardeepx_user_gemini_key");alert("Aapki key hata di gayi. Ab default shared key use hogi.")}
+}
 
 const SAFETY_SYSTEM_PROMPT="You are PardeepX, a helpful personal AI assistant for the user Pardeep. Answer clearly and helpfully in the same language/style the user writes in (Hindi, English, or Hinglish). IMPORTANT SAFETY RULE: you must refuse — politely, in one short line — any request that could cause harm to a person, group, or country (e.g. violence, weapons, hacking/malware, self-harm, hate speech, illegal activity, harming India's or any nation's security/interests). For all normal, safe questions, answer fully and usefully.";
 
@@ -129,8 +139,8 @@ document.getElementById("sendBtn").disabled=false;
 }
 
 async function getAIReply(text,image){
-if(!GEMINI_API_KEY){
-throw new Error("Code mein GEMINI_API_KEY set nahi hai.");
+if(!getApiKey()){
+throw new Error("Koi Gemini API key set nahi hai.");
 }
 if(image){
 return await callImageModel(text,image);
@@ -165,7 +175,7 @@ safetySettings:[
 {category:"HARM_CATEGORY_DANGEROUS_CONTENT",threshold:"BLOCK_MEDIUM_AND_ABOVE"}
 ]
 };
-const res=await fetchWithRetry(url,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":GEMINI_API_KEY},body:JSON.stringify(body)});
+const res=await fetchWithRetry(url,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":getApiKey()},body:JSON.stringify(body)});
 const data=await res.json();
 if(!res.ok){
 conversationHistory.pop();
@@ -198,7 +208,7 @@ safetySettings:[
 {category:"HARM_CATEGORY_DANGEROUS_CONTENT",threshold:"BLOCK_MEDIUM_AND_ABOVE"}
 ]
 };
-const res=await fetchWithRetry(url,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":GEMINI_API_KEY},body:JSON.stringify(body)});
+const res=await fetchWithRetry(url,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":getApiKey()},body:JSON.stringify(body)});
 const data=await res.json();
 if(!res.ok){
 if(res.status===503||res.status===429)throw new Error("AI abhi busy hai (high demand). Kripya thodi der baad dobara try karein.");
