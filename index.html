@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PardeepX — Your AI</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f7f8fc;--panel:#fff;--text:#15171c;--muted:#737985;--border:#e7e9ef;--accent:#6d5dfc;--accent2:#8b5cf6;--user:#eeeaff;--shadow:0 12px 35px rgba(40,35,80,.08)}
+body.dark{--bg:#0c0d12;--panel:#15161d;--text:#f4f5f7;--muted:#9296a3;--border:#272934;--accent:#8b7cff;--accent2:#a66cff;--user:#252139;--shadow:0 12px 35px rgba(0,0,0,.25)}
+body{font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+.app{height:100vh;display:flex}
+.sidebar{width:270px;background:var(--panel);border-right:1px solid var(--border);padding:18px;display:flex;flex-direction:column;transition:.3s;z-index:20}
+.brand{display:flex;align-items:center;gap:11px;margin-bottom:25px}
+.logo,.welcome-logo{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;box-shadow:0 8px 20px rgba(109,93,252,.25)}
+.logo{width:40px;height:40px;border-radius:13px;font-size:17px}
+.brand-text{font-size:20px;font-weight:800}.brand-text span{color:var(--accent)}
+.new-chat{border:0;background:var(--user);color:var(--text);padding:13px 16px;border-radius:13px;cursor:pointer;font-size:14px;font-weight:700;margin-bottom:22px}
+.history-title{color:var(--muted);font-size:12px;font-weight:700;margin:5px 7px 10px;text-transform:uppercase;letter-spacing:.7px}
+.history{overflow-y:auto;flex:1}.history-item{padding:11px 12px;border-radius:10px;margin-bottom:4px;cursor:pointer;color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.history-item:hover{background:var(--bg);color:var(--text)}
+.bottom-menu{border-top:1px solid var(--border);padding-top:12px}.menu-btn{width:100%;padding:11px;background:transparent;border:0;color:var(--muted);text-align:left;cursor:pointer;border-radius:9px}.menu-btn:hover{background:var(--bg);color:var(--text)}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:70px;display:flex;align-items:center;justify-content:space-between;padding:0 25px;border-bottom:1px solid var(--border);background:var(--panel)}
+.mobile-menu{display:none;background:transparent;border:0;font-size:24px;color:var(--text);cursor:pointer}
+.model-name{font-weight:800;font-size:15px}.model-name small{display:block;color:var(--muted);font-size:11px;font-weight:500;margin-top:2px}
+.top-actions{display:flex;gap:8px}.icon-btn{width:38px;height:38px;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:11px;cursor:pointer;font-size:17px}
+.chat{flex:1;overflow-y:auto;padding:40px 20px 160px}.chat-inner{width:min(900px,100%);margin:auto}
+.welcome{min-height:55vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+.welcome-logo{width:72px;height:72px;border-radius:24px;font-size:28px;margin-bottom:22px}
+.welcome h1{font-size:clamp(30px,5vw,48px);margin-bottom:10px;letter-spacing:-1.5px}.gradient-text{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;color:transparent}
+.welcome p{color:var(--muted);max-width:540px;line-height:1.6}
+.suggestions{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:min(650px,100%);margin-top:30px}
+.suggestion{padding:15px;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:14px;cursor:pointer;text-align:left;transition:.2s}
+.suggestion:hover{border-color:var(--accent);transform:translateY(-2px)}.suggestion b{display:block;margin-bottom:5px}.suggestion span{font-size:12px;color:var(--muted)}
+.message{display:flex;gap:12px;margin:22px 0}.message.user{justify-content:flex-end}
+.avatar{width:34px;height:34px;min-width:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800}
+.ai-avatar{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}.user-avatar{background:var(--user);color:var(--text)}
+.bubble{max-width:75%;line-height:1.65;font-size:14px}.user .bubble{background:var(--user);padding:12px 15px;border-radius:17px 17px 5px 17px}.ai .bubble{padding:3px 0}
+.typing{display:flex;gap:5px;padding:8px 0}.typing span{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:bounce 1s infinite}.typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,70%,100%{transform:translateY(0)}35%{transform:translateY(-6px)}}
+.input-area{position:fixed;bottom:0;left:270px;right:0;padding:15px 20px 20px;background:linear-gradient(transparent,var(--bg) 28%)}
+.input-box{width:min(900px,100%);margin:auto;background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:20px;padding:9px}
+.input-row{display:flex;align-items:flex-end;gap:8px}textarea{flex:1;resize:none;max-height:130px;min-height:42px;border:0;outline:0;background:transparent;color:var(--text);font-family:inherit;font-size:14px;padding:11px 8px}textarea::placeholder{color:var(--muted)}
+.input-action{width:40px;height:40px;border:0;border-radius:12px;background:transparent;color:var(--muted);cursor:pointer;font-size:17px}.input-action:hover{background:var(--bg);color:var(--text)}
+.send-btn{width:42px;height:42px;border:0;border-radius:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;cursor:pointer;font-size:17px}.send-btn:disabled{opacity:.4}
+.disclaimer{text-align:center;font-size:10px;color:var(--muted);margin-top:8px}.file-name{display:none;padding:7px 10px;background:var(--bg);border-radius:8px;color:var(--muted);font-size:11px;margin:3px 5px}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:15}
+@media(max-width:750px){
+.sidebar{position:fixed;left:-280px;top:0;bottom:0;box-shadow:10px 0 35px rgba(0,0,0,.15)}.sidebar.open{left:0}.overlay.show{display:block}.mobile-menu{display:block}
+.topbar{padding:0 14px}.input-area{left:0;padding:10px 10px 13px}.chat{padding:25px 14px 150px}.suggestions{grid-template-columns:1fr}.bubble{max-width:85%}.welcome{min-height:65vh}.welcome h1{font-size:34px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar" id="sidebar">
+<div class="brand"><div class="logo">PX</div><div class="brand-text">Pardeep<span>X</span></div></div>
+<button class="new-chat" onclick="newChat()">＋ New conversation</button>
+<div class="history-title">Recent chats</div><div class="history" id="history"></div>
+<div class="bottom-menu">
+<button class="menu-btn" onclick="toggleTheme()">◐ &nbsp; Appearance</button>
+<button class="menu-btn" onclick="showAbout()">ⓘ &nbsp; About PardeepX</button>
+</div>
+</aside>
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+<main class="main">
+<header class="topbar">
+<div style="display:flex;align-items:center;gap:12px"><button class="mobile-menu" onclick="openSidebar()">☰</button><div class="model-name">PardeepX AI<small>Personal AI Assistant</small></div></div>
+<div class="top-actions"><button class="icon-btn" onclick="toggleTheme()">◐</button><button class="icon-btn" onclick="newChat()">＋</button></div>
+</header>
+<section class="chat" id="chat"><div class="chat-inner" id="chatInner">
+<div class="welcome" id="welcome">
+<div class="welcome-logo">PX</div><h1>Hello, I'm <span class="gradient-text">PardeepX</span></h1>
+<p>Your personal AI assistant. Ask questions, generate ideas, write content, learn something new, or simply start a conversation.</p>
+<div class="suggestions">
+<button class="suggestion" onclick="useSuggestion('Mujhe ek motivational thought batao')"><b>✦ Motivation</b><span>Give me a powerful motivational thought</span></button>
+<button class="suggestion" onclick="useSuggestion('Mujhe HTML website banane mein help karo')"><b>⌘ Coding</b><span>Help me build a website</span></button>
+<button class="suggestion" onclick="useSuggestion('Mujhe aaj kuch naya sikhao')"><b>◈ Learn</b><span>Teach me something interesting</span></button>
+<button class="suggestion" onclick="useSuggestion('Mere liye ek business idea batao')"><b>✧ Ideas</b><span>Generate a creative business idea</span></button>
+</div></div>
+</div></section>
+</main></div>
+<div class="input-area"><div class="input-box"><div class="file-name" id="fileName"></div><div class="input-row">
+<input type="file" id="fileInput" hidden onchange="handleFile(this)">
+<button class="input-action" onclick="document.getElementById('fileInput').click()">＋</button>
+<textarea id="messageInput" rows="1" placeholder="Message PardeepX..." onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+<button class="input-action" onclick="voiceInput()">🎙</button><button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+</div></div><div class="disclaimer">PardeepX can make mistakes. Check important information.</div></div>
+<script>
+const input=document.getElementById("messageInput"),chatInner=document.getElementById("chatInner"),welcome=document.getElementById("welcome"),historyBox=document.getElementById("history");
+let chats=JSON.parse(localStorage.getItem("pardeepx_chats")||"[]");
+
+function sendMessage(){const text=input.value.trim();if(!text)return;if(document.getElementById("welcome"))document.getElementById("welcome").remove();addMessage("user",text);input.value="";autoResize(input);saveChat(text);showTyping();setTimeout(()=>{removeTyping();addMessage("ai",generateDemoReply(text))},900)}
+function generateDemoReply(text){
+const msg=text.toLowerCase();
+if(msg.includes("hello")||msg.includes("hi")||msg.includes("hey")||msg.includes("namaste"))return`Namaste 👋<br><br>Main <b>PardeepX</b> hoon — tumhara personal AI assistant. Batao, aaj main tumhari kis cheez mein help karun?`;
+if(msg.includes("motivation"))return`🔥 <b>Motivational Thought</b><br><br>"Raasta mushkil ho sakta hai, lekin agar iraada mazboot ho toh manzil door nahi hoti."<br><br>— <b>PardeepX</b>`;
+if(msg.includes("html")||msg.includes("website")||msg.includes("coding"))return`💻 Bilkul! Main website development mein help kar sakta hoon.<br><br>Tum HTML, CSS, JavaScript, React ya kisi bhi web project ke baare mein pooch sakte ho.<br><br>Agar tum chaho toh main tumhare liye complete website ka code bhi bana sakta hoon.`;
+if(msg.includes("business")||msg.includes("idea"))return`💡 <b>Business Idea</b><br><br>Small businesses ke liye inventory, billing, customer records aur AI assistance ko ek single web app mein combine kiya ja sakta hai.`;
+if(msg.includes("learn")||msg.includes("sikhao"))return`🧠 <b>Aaj kuch naya:</b><br><br>AI models examples se language ke patterns seekhte hain aur un patterns ke basis par suitable response generate karte hain.`;
+return`Main <b>PardeepX</b> hoon. 🤖<br><br>Tumne kaha: <b>${escapeHTML(text)}</b><br><br>Yeh abhi demo version hai. Real AI model connect karne ke baad PardeepX intelligent AI responses generate karega.`
+}
+function addMessage(type,text){const message=document.createElement("div");message.className=`message ${type}`;message.innerHTML=type==="user"?`<div class="bubble">${escapeHTML(text)}</div><div class="avatar user-avatar">YOU</div>`:`<div class="avatar ai-avatar">PX</div><div class="bubble">${text}</div>`;chatInner.appendChild(message);scrollBottom()}
+function showTyping(){const t=document.createElement("div");t.className="message ai";t.id="typing";t.innerHTML=`<div class="avatar ai-avatar">PX</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;chatInner.appendChild(t);scrollBottom()}
+function removeTyping(){const t=document.getElementById("typing");if(t)t.remove()}
+function newChat(){chatInner.innerHTML=`<div class="welcome" id="welcome"><div class="welcome-logo">PX</div><h1>Hello, I'm <span class="gradient-text">PardeepX</span></h1><p>Your personal AI assistant. Start a fresh conversation.</p><div class="suggestions"><button class="suggestion" onclick="useSuggestion('Mujhe ek motivational thought batao')"><b>✦ Motivation</b><span>Get motivation</span></button><button class="suggestion" onclick="useSuggestion('Mujhe HTML website banane mein help karo')"><b>⌘ Coding</b><span>Build something</span></button><button class="suggestion" onclick="useSuggestion('Mujhe aaj kuch naya sikhao')"><b>◈ Learn</b><span>Learn something</span></button><button class="suggestion" onclick="useSuggestion('Mere liye ek business idea batao')"><b>✧ Ideas</b><span>Generate ideas</span></button></div></div>`;input.value="";closeSidebar()}
+function useSuggestion(text){input.value=text;autoResize(input);sendMessage()}
+function saveChat(text){chats.unshift({text,date:new Date().toLocaleString()});chats=chats.slice(0,15);localStorage.setItem("pardeepx_chats",JSON.stringify(chats));renderHistory()}
+function renderHistory(){historyBox.innerHTML="";chats.forEach(chat=>{const item=document.createElement("div");item.className="history-item";item.textContent=chat.text;item.onclick=()=>{input.value=chat.text;autoResize(input)};historyBox.appendChild(item)})}
+function toggleTheme(){document.body.classList.toggle("dark");localStorage.setItem("pardeepx_theme",document.body.classList.contains("dark")?"dark":"light")}
+if(localStorage.getItem("pardeepx_theme")==="dark")document.body.classList.add("dark");
+function handleFile(fileInput){const file=fileInput.files[0];if(!file)return;const fileName=document.getElementById("fileName");fileName.style.display="block";fileName.textContent="📎 "+file.name}
+function voiceInput(){if(!("webkitSpeechRecognition"in window)){alert("Voice input is not supported in this browser.");return}const recognition=new webkitSpeechRecognition();recognition.lang="hi-IN";recognition.start();recognition.onresult=e=>{input.value=e.results[0][0].transcript;autoResize(input)}}
+function handleKey(event){if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();sendMessage()}}
+function autoResize(element){element.style.height="auto";element.style.height=Math.min(element.scrollHeight,130)+"px"}
+function scrollBottom(){setTimeout(()=>document.getElementById("chat").scrollTo({top:document.getElementById("chat").scrollHeight,behavior:"smooth"}),50)}
+function openSidebar(){document.getElementById("sidebar").classList.add("open");document.getElementById("overlay").classList.add("show")}
+function closeSidebar(){document.getElementById("sidebar").classList.remove("open");document.getElementById("overlay").classList.remove("show")}
+function showAbout(){alert("PardeepX AI\\n\\nYour personal AI assistant.\\nCreated for Pardeep.")}
+function escapeHTML(text){const div=document.createElement("div");div.textContent=text;return div.innerHTML}
+renderHistory();
+</script>
+</body>
+</html>
