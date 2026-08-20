@@ -78,6 +78,7 @@ body{font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text);h
 <div class="bottom-menu">
 <button class="menu-btn" onclick="toggleTheme()">◐ &nbsp; Appearance</button>
 <button class="menu-btn" onclick="setApiKey()">🔑 &nbsp; Set Gemini API Key</button>
+<button class="menu-btn" onclick="setGoogleSearchConfig()">🔎 &nbsp; Set Google Search Key</button>
 <button class="menu-btn" onclick="showAbout()">ⓘ &nbsp; About PardeepX</button>
 <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:12px">Developed and designed by<br><b>Pardeep Shekhawat</b></div>
 </div>
@@ -129,10 +130,43 @@ if(key.trim()){localStorage.setItem("pardeepx_user_gemini_key",key.trim());alert
 else{localStorage.removeItem("pardeepx_user_gemini_key");alert("Aapki key hata di gayi. Ab default shared key use hogi.")}
 }
 
-const SAFETY_SYSTEM_PROMPT="You are PardeepX, a helpful personal AI assistant for the user Pardeep. Answer clearly and helpfully in the same language/style the user writes in (Hindi, English, or Hinglish). You have access to a live Google Search tool — use it whenever a question involves current events, news, recent appointments/resignations, prices, scores, dates, or any fact that could have changed recently or that you are not fully certain about, so your answer reflects the latest real information instead of outdated knowledge. IMPORTANT SAFETY RULE: you must refuse — politely, in one short line — any request that could cause harm to a person, group, or country (e.g. violence, weapons, hacking/malware, self-harm, hate speech, illegal activity, harming India's or any nation's security/interests). For all normal, safe questions, answer fully and usefully.";
+// ---- Google Custom Search (real-time web results) ----
+function getGoogleSearchKey(){return localStorage.getItem("pardeepx_google_cse_key")||""}
+function getGoogleSearchCx(){return localStorage.getItem("pardeepx_google_cse_cx")||""}
+function setGoogleSearchConfig(){
+const currentKey=getGoogleSearchKey();
+const key=prompt("Google Custom Search API Key daalein (Google Cloud Console se milti hai):",currentKey);
+if(key===null)return;
+const currentCx=getGoogleSearchCx();
+const cx=prompt("Search Engine ID (CX) daalein (Programmable Search Engine se milta hai):",currentCx);
+if(cx===null)return;
+if(key.trim()&&cx.trim()){
+localStorage.setItem("pardeepx_google_cse_key",key.trim());
+localStorage.setItem("pardeepx_google_cse_cx",cx.trim());
+alert("Google Search config saved ✅ Ab har jawab live Google results se milega.");
+}else{
+localStorage.removeItem("pardeepx_google_cse_key");
+localStorage.removeItem("pardeepx_google_cse_cx");
+alert("Google Search config hata di gayi.");
+}
+}
 
-const TEXT_MODELS=["gemini-3.5-flash-lite","gemini-flash-lite-latest","gemini-2.5-flash","gemini-3.5-flash"];
-const IMAGE_MODELS=["gemini-3.1-flash-image","gemini-2.5-flash-image"];
+async function googleSearch(query){
+const key=getGoogleSearchKey(),cx=getGoogleSearchCx();
+if(!key||!cx)return null;
+const url=`https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(key)}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent(query)}&num=5`;
+try{
+const res=await fetch(url);
+const data=await res.json();
+if(!res.ok||!data.items)return null;
+return data.items.map((it,i)=>`[${i+1}] ${it.title}\n${it.snippet}\nSource: ${it.link}`).join("\n\n");
+}catch(e){return null}
+}
+
+const SAFETY_SYSTEM_PROMPT="You are PardeepX, a helpful personal AI assistant for the user Pardeep. Answer clearly and helpfully in the same language/style the user writes in (Hindi, English, or Hinglish). IMPORTANT SAFETY RULE: you must refuse — politely, in one short line — any request that could cause harm to a person, group, or country (e.g. violence, weapons, hacking/malware, self-harm, hate speech, illegal activity, harming India's or any nation's security/interests). For all normal, safe questions, answer fully and usefully.";
+
+const TEXT_MODEL="gemini-3.1-flash-lite";
+const IMAGE_MODEL="gemini-3.1-flash-image";
 let attachedImage=null; // {mimeType, base64, name}
 let conversationHistory=[]; // [{role:"user"|"model", parts:[{text}]}]
 
@@ -167,50 +201,33 @@ return await callImageModel(text,image);
 return await callTextModel(text);
 }
 
-async function fetchWithRetry(url,options,maxRetries=3){
-let lastRes;
+async function fetchWithRetry(url,options,maxRetries=2){
+let lastErr;
 for(let attempt=0;attempt<=maxRetries;attempt++){
-let res;
-try{
-res=await fetch(url,options);
-}catch(networkErr){
-if(attempt===maxRetries)throw networkErr;
-await new Promise(r=>setTimeout(r,500*Math.pow(2,attempt)));
-continue;
-}
+const res=await fetch(url,options);
 if(res.status!==503&&res.status!==429)return res;
-lastRes=res;
+lastErr=res;
 if(attempt<maxRetries){
-const wait=800*Math.pow(2,attempt);
+const wait=600*Math.pow(2,attempt);
 await new Promise(r=>setTimeout(r,wait));
 }
 }
-return lastRes;
-}
-
-// Tries each model in `models` (in order). If a model keeps returning 503/429
-// even after retries, it automatically moves on to the next model instead of
-// giving up, so the user rarely sees a "busy" error.
-async function fetchWithModelFallback(models,buildUrl,options){
-let lastRes,lastData;
-for(let i=0;i<models.length;i++){
-const url=buildUrl(models[i]);
-const res=await fetchWithRetry(url,options);
-if(!res)continue;
-if(res.status!==503&&res.status!==429&&res.status!==404)return{res,model:models[i]};
-lastRes=res;
-try{lastData=await res.clone().json()}catch(e){}
-if(res.status===404)continue; // model unavailable, skip straight to next model
-}
-return{res:lastRes,data:lastData,model:models[models.length-1],exhausted:true};
+return lastErr;
 }
 
 async function callTextModel(text){
-conversationHistory.push({role:"user",parts:[{text:text}]});
+const url=`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent`;
+let userParts=[{text:text}];
+if(getGoogleSearchKey()&&getGoogleSearchCx()){
+const searchResults=await googleSearch(text);
+if(searchResults){
+userParts=[{text:`User ka sawaal: ${text}\n\nYahan kuch latest/live Google search results hain, agar relevant ho to inka use karke sahi aur up-to-date jawab dein (results ki khud se translate/summarize karke, source quote na karein):\n\n${searchResults}`}];
+}
+}
+conversationHistory.push({role:"user",parts:userParts});
 const body={
 contents:conversationHistory,
 systemInstruction:{parts:[{text:SAFETY_SYSTEM_PROMPT}]},
-tools:[{google_search:{}}],
 safetySettings:[
 {category:"HARM_CATEGORY_HARASSMENT",threshold:"BLOCK_MEDIUM_AND_ABOVE"},
 {category:"HARM_CATEGORY_HATE_SPEECH",threshold:"BLOCK_MEDIUM_AND_ABOVE"},
@@ -218,17 +235,11 @@ safetySettings:[
 {category:"HARM_CATEGORY_DANGEROUS_CONTENT",threshold:"BLOCK_MEDIUM_AND_ABOVE"}
 ]
 };
-const options={method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":getApiKey()},body:JSON.stringify(body)};
-const buildUrl=model=>`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-const{res,exhausted}=await fetchWithModelFallback(TEXT_MODELS,buildUrl,options);
-if(!res){
-conversationHistory.pop();
-throw new Error("Network error. Apna internet connection check karein.");
-}
-const data=await res.json().catch(()=>({}));
+const res=await fetchWithRetry(url,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":getApiKey()},body:JSON.stringify(body)});
+const data=await res.json();
 if(!res.ok){
 conversationHistory.pop();
-if(exhausted&&(res.status===503||res.status===429))throw new Error("AI abhi bahut busy hai (high demand). Kripya thodi der (30-60 sec) baad dobara try karein.");
+if(res.status===503||res.status===429)throw new Error("AI abhi busy hai (high demand). Kripya thodi der baad dobara try karein.");
 throw new Error(data?.error?.message||"AI se response nahi mila. API key check karein.");
 }
 const candidate=data?.candidates?.[0];
@@ -239,21 +250,11 @@ return "🚫 Yeh request block kar di gayi hai kyunki yeh kisi insaan, samuh, ya
 const rawText=candidate?.content?.parts?.map(p=>p.text||"").join("")||"Maaf kijiye, koi response nahi mila.";
 conversationHistory.push({role:"model",parts:[{text:rawText}]});
 if(conversationHistory.length>40)conversationHistory=conversationHistory.slice(-40);
-let html=escapeHTML(rawText).replace(/\n/g,"<br>");
-html+=buildSourcesHTML(candidate);
-return html;
-}
-
-function buildSourcesHTML(candidate){
-const chunks=candidate?.groundingMetadata?.groundingChunks;
-if(!chunks||!chunks.length)return"";
-const links=chunks.map(c=>c?.web).filter(w=>w&&w.uri).slice(0,5);
-if(!links.length)return"";
-const items=links.map(w=>`<a href="${w.uri}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">${escapeHTML(w.title||w.uri)}</a>`).join("<br>");
-return `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">🔍 Sources:<br>${items}</div>`;
+return escapeHTML(rawText).replace(/\n/g,"<br>");
 }
 
 async function callImageModel(text,image){
+const url=`https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:generateContent`;
 const parts=[];
 if(text)parts.push({text:text});
 parts.push({inlineData:{mimeType:image.mimeType,data:image.base64}});
@@ -267,13 +268,10 @@ safetySettings:[
 {category:"HARM_CATEGORY_DANGEROUS_CONTENT",threshold:"BLOCK_MEDIUM_AND_ABOVE"}
 ]
 };
-const options={method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":getApiKey()},body:JSON.stringify(body)};
-const buildUrl=model=>`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-const{res,exhausted}=await fetchWithModelFallback(IMAGE_MODELS,buildUrl,options);
-if(!res)throw new Error("Network error. Apna internet connection check karein.");
-const data=await res.json().catch(()=>({}));
+const res=await fetchWithRetry(url,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":getApiKey()},body:JSON.stringify(body)});
+const data=await res.json();
 if(!res.ok){
-if(exhausted&&(res.status===503||res.status===429))throw new Error("AI abhi bahut busy hai (high demand). Kripya thodi der (30-60 sec) baad dobara try karein.");
+if(res.status===503||res.status===429)throw new Error("AI abhi busy hai (high demand). Kripya thodi der baad dobara try karein.");
 throw new Error(data?.error?.message||"Image AI se response nahi mila. API key check karein.");
 }
 const candidate=data?.candidates?.[0];
@@ -347,7 +345,7 @@ speechSynthesis.cancel();
 const utter=new SpeechSynthesisUtterance(text);
 utter.lang="hi-IN";
 const v=pickHindiVoice();if(v)utter.voice=v;
-utter.rate=1;utter.pitch=0.88;utter.volume=1;
+utter.rate=0.92;utter.pitch=0.55;utter.volume=1;
 let done=false;
 const finish=()=>{if(done)return;done=true;if(onEnd)onEnd()};
 utter.onend=finish;utter.onerror=finish;
@@ -356,22 +354,17 @@ speechSynthesis.speak(utter);
 
 function htmlToSpeechText(html){
 const div=document.createElement("div");
-div.innerHTML=(html||"").replace(/<br\s*\/?>/gi,". ").replace(/<img[^>]*>/gi,"").replace(/<li[^>]*>/gi," ");
+div.innerHTML=(html||"").replace(/<br\s*\/?>/gi,". ").replace(/<img[^>]*>/gi,"");
 let t=(div.textContent||div.innerText||"").trim();
-t=t.replace(/```[\s\S]*?```/g,"");
-t=t.replace(/\*\*\*(.*?)\*\*\*/g,"$1");
 t=t.replace(/\*\*(.*?)\*\*/g,"$1");
 t=t.replace(/\*(.*?)\*/g,"$1");
 t=t.replace(/__(.*?)__/g,"$1");
 t=t.replace(/_(.*?)_/g,"$1");
-t=t.replace(/`([^`]*)`/g,"$1");
-t=t.replace(/^\s{0,3}#{1,6}\s*/gm,"");
-t=t.replace(/^\s*[-*•●▪]\s+/gm,"");
-t=t.replace(/^\s*\d+\.\s+/gm,"");
-t=t.replace(/\[([^\]]*)\]\([^)]*\)/g,"$1");
-// keep only letters (any language), numbers, spaces and natural pause punctuation
-t=t.replace(/[^\p{L}\p{N}\s.,!?;:।'"-]/gu,"");
-t=t.replace(/\s{2,}/g," ").replace(/\n{2,}/g,". ").trim();
+t=t.replace(/`{1,3}([^`]*)`{1,3}/g,"$1");
+t=t.replace(/^#{1,6}\s*/gm,"");
+t=t.replace(/[*_#`~>|]/g,"");
+t=t.replace(/^[-•]\s*/gm,"");
+t=t.replace(/\s{2,}/g," ").trim();
 return t;
 }
 
