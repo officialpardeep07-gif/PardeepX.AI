@@ -131,7 +131,7 @@ else{localStorage.removeItem("pardeepx_user_gemini_key");alert("Aapki key hata d
 
 const SAFETY_SYSTEM_PROMPT="You are PardeepX, a helpful personal AI assistant for the user Pardeep. Answer clearly and helpfully in the same language/style the user writes in (Hindi, English, or Hinglish). You have access to a live Google Search tool — use it whenever a question involves current events, news, recent appointments/resignations, prices, scores, dates, or any fact that could have changed recently or that you are not fully certain about, so your answer reflects the latest real information instead of outdated knowledge. IMPORTANT SAFETY RULE: you must refuse — politely, in one short line — any request that could cause harm to a person, group, or country (e.g. violence, weapons, hacking/malware, self-harm, hate speech, illegal activity, harming India's or any nation's security/interests). For all normal, safe questions, answer fully and usefully.";
 
-const TEXT_MODELS=["gemini-flash-lite-latest","gemini-2.5-flash-lite","gemini-2.5-flash"];
+const TEXT_MODELS=["gemini-3.5-flash-lite","gemini-flash-lite-latest","gemini-2.5-flash","gemini-3.5-flash"];
 const IMAGE_MODELS=["gemini-3.1-flash-image","gemini-2.5-flash-image"];
 let attachedImage=null; // {mimeType, base64, name}
 let conversationHistory=[]; // [{role:"user"|"model", parts:[{text}]}]
@@ -197,9 +197,10 @@ for(let i=0;i<models.length;i++){
 const url=buildUrl(models[i]);
 const res=await fetchWithRetry(url,options);
 if(!res)continue;
-if(res.status!==503&&res.status!==429)return{res,model:models[i]};
+if(res.status!==503&&res.status!==429&&res.status!==404)return{res,model:models[i]};
 lastRes=res;
 try{lastData=await res.clone().json()}catch(e){}
+if(res.status===404)continue; // model unavailable, skip straight to next model
 }
 return{res:lastRes,data:lastData,model:models[models.length-1],exhausted:true};
 }
